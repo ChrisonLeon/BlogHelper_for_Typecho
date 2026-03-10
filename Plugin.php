@@ -121,6 +121,8 @@ class Plugin implements PluginInterface
         );
         $form->addInput($showInBackend);
         
+        $php_code = '<?php Typecho_Plugin::factory(\'Blog_Helper\')->Chrison(); ?>';
+        $show_description = '在前台显示微信运动：页面任意位置插入指定代码即可=> ' . htmlspecialchars($php_code);
         
         // 是否在前台显示
         $showInFront = new Radio(
@@ -131,7 +133,7 @@ class Plugin implements PluginInterface
             ),
             '1',
             '前台显示',
-            "在前台显示微信运动（页面任意位置插入\<?php Typecho_Plugin::factory('Blog_Helper')->Chrison(); ?\>）"
+            $show_description
         );
         $form->addInput($showInFront);
         
@@ -166,7 +168,7 @@ class Plugin implements PluginInterface
         $customCSS = new Textarea(
             'customCSS',
             NULL,
-            '.chrison-blog-helper-footer { text-align: center; padding: 20px; margin-top: 30px; color: #666; } 
+            '.chrison-blog-helper-footer { text-align: center; padding: 20px; margin: 0 auto; color: #666; } 
 .chrison-blog-helper-footer .steps{font-size: 24px; font-weight: bold; color: #4CAF50;} 
 .chrison-blog-helper-footer .date{font-size: 12px; color: #999;}',
             '自定义CSS',
@@ -219,17 +221,16 @@ class Plugin implements PluginInterface
         $showInFront = $options->showInFront;
         $frontFormat = $options->frontFormat;
         $isCustomCss = $options->isCustomCss;
-        $defaultCSS = '.chrison-blog-helper-footer { text-align: center; padding: 20px; margin-top: 30px; color: #666; } .chrison-blog-helper-footer .steps{font-size: 24px; font-weight: bold; color: #4CAF50;} .chrison-blog-helper-footer .date{font-size: 12px; color: #999;}';
-        $customCSS = $options->customCSS;
-        $finalCSS = !empty($customCSS) ? $customCSS : $defaultCSS;
+        $defaultCSS = '.chrison-blog-helper-footer { text-align: center; padding: 20px; margin: 0 auto; color: #666; } .chrison-blog-helper-footer .steps{font-size: 24px; font-weight: bold; color: #4CAF50;} .chrison-blog-helper-footer .date{font-size: 12px; color: #999;}';
         
         if($isCustomCss === '0'){
-            echo '<style type="text/css">' . "\n" . 
+            echo '<style type="text/css">' . "\n" .
                  htmlspecialchars($defaultCSS) . "\n" . 
                  '</style>' . "\n";
         } else {
-            echo '<style type="text/css">' . "\n" . 
-                 htmlspecialchars($finalCSS) . "\n" . 
+            $customCSS = $options->customCSS;
+            echo '<style type="text/css">' . "\n" .
+                 htmlspecialchars($customCSS) . "\n" . 
                  '</style>' . "\n";
         }
         
