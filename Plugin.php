@@ -23,7 +23,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package Blog Helper
  * @author Chrison
- * @version 1.0.0
+ * @version 1.2.0
  * @link https://chrison.cn
  */
 class Plugin implements PluginInterface
