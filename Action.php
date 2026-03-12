@@ -161,6 +161,9 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             $this->response->throwJson(['status' => 'fail', 'message' => '参数异常（3）']);
         }
         
+        // 链接数据库
+        $db = Db::get();
+        $prefix = $db->getPrefix();
         // 获取系统配置选项
         $options = Options::alloc();
         // 获取插件配置
@@ -168,6 +171,8 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
         // 插件参数值
         $secret = $plugin->secret_key;
         $mid = $plugin->mid;
+        // markdown前缀
+        $markdown = '<!--markdown-->';
         
         // 加解密
         $_sign = md5($action . $openid . $title . $secret);
@@ -181,36 +186,21 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             $this->response->setStatus(403);
             $this->response->throwJson(['status' => 'fail', 'message' => '分类ID未配置']);
         }
-        
-        $db = Db::get();
-        $prefix = $db->getPrefix();
-        
-        // 加入markdown
-        $content = '<!--markdown-->' . $content;
-        
-        // 1. 处理图片下载和插入
+
+        // 1. 图片下载
+        $localImage = '';
         if (!empty($image)) {
-            // 根据位置插入图片到内容中
-            
             $localImage = $this->downloadImage($image);
-            if ($localImage) {
-                $imgHtml = '<img src="' . $localImage . '" alt="' . $title . '">';
-                if ($imagePosition == 'top') {
-                    $content = $imgHtml . "\n\n" . $content;
-                } elseif ($imagePosition == 'bottom') {
-                    $content = $content . "\n\n" . $imgHtml;
-                }
-            } else {
+            if (!$localImage) {
                 $this->response->setStatus(403);
                 $this->response->throwJson(['status' => 'fail', 'message' => '图片提交失败']);
             }
         }
-        
-        
+
         // 2. 准备文章数据
         $slug = Typecho_Common::slugName($title);
         
-        // 确保slug唯一
+        // 3. 确保slug唯一
         $existing = $db->fetchRow($db->select('cid')
             ->from('table.contents')
             ->where('slug = ?', $slug)
@@ -236,7 +226,7 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             'parent'     => 0,
             'views'      => 1,
             'password'   => null,
-            'template'   => 'weChat'
+            'template'   => ''
         ];
         
         try {
@@ -258,20 +248,45 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             $insertRelation = $db->insert('table.relationships')->rows($relationshipData);
             $db->query($insertRelation);
             
-            // 分类也需要+1
+            // 6. 处理分类,需要count+1
             $mid_row = $db->fetchRow($db->select('count')->from('table.metas')->where('mid = ?', $mid));
 			$db->query($db->update('table.metas')->rows(array('count' => (int) $mid_row['count'] + 1))->where('mid = ?', $mid));
             
-            // 6. 处理标签
+            // 7. 处理标签,需要count+1
             if (!empty($tags)) {
                 $this->processTags($postId, $tags);
             }
+
+            // 8. 处理图片为附件
+            $attachmentHtml = '';
+            if (!empty($localImage)) {
+                $attachmentHtml = $this->processImageAsAttachment($postId, $localImage);
+            }
+            
+
+            // 9.拼接markdown、和图片html
+            $finalContent = '';
+            if (!empty($attachmentHtml)) {
+                if ($imagePosition == 'top') {
+                    $finalContent = $markdown . "\n\n" . $attachmentHtml . "\n\n" . $content;
+                } elseif ($imagePosition == 'bottom') {
+                    $finalContent = $markdown . "\n\n" . $content . "\n\n" . $attachmentHtml;
+                }
+            } else {
+                $finalContent = $markdown . "\n\n" . $content;
+            }
+            
+            // 10.更新文章内容
+            $db->query($db->update('table.contents')->rows(['text' => $finalContent])->where('cid = ?', $postId));
+            
+            // 11.添加自定义字段
+            $this->addPostCustomFields($postId,['chrison_via' => '微信小程序', 'chrison_version' => '1.0.0']);
             
             $this->response->setStatus(200);
             $this->response->throwJson(['status' => 'success', 'message' => '发布成功']);
             
         } catch (Exception $e) {
-            $db->rollBack();
+            //$db->rollBack();
             // 记录错误日志
             error_log('插入文章失败：' . $e->getMessage());
             
@@ -363,6 +378,66 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             error_log('下载图片失败：' . $e->getMessage() . ' URL: ' . $imageUrl);
             return false;
         }
+    }
+    
+    private function processImageAsAttachment($postId, $imageUrl){
+        // 获取文件的绝对路径
+        $absolutePath = __TYPECHO_ROOT_DIR__ . $imageUrl;
+        
+        if (!file_exists($absolutePath)) {
+            throw new Exception('文件不存在');
+        }
+        
+        
+        $db = Db::get();
+        
+        // 获取文件信息
+        $fileSize = filesize($absolutePath);
+        $fileInfo = pathinfo($imageUrl);
+        
+        // 构造元数据数组
+        $attachment = [
+            'name' => $fileInfo['basename'],    // 文件名
+            'path' => $imageUrl,           // 相对路径
+            'size' => $fileSize,                // 文件大小（字节）
+            'type' => 'application/octet-stream', // MIME类型
+            'mime' => Common::mimeContentType($absolutePath) // 更精确的MIME类型
+        ];
+        
+        // 插入数据
+        $data = [
+            'title' => $attachment['name'],           // 标题，通常为文件名
+            'slug' => $attachment['name'],            // 缩略名，也可生成唯一值
+            'created' => time(),                      // 创建时间戳
+            'modified' => time(),                     // 修改时间戳
+            'text' => serialize($attachment),         // 元数据序列化
+            'order' => 0,                             // 排序
+            'authorId' => 1,                    // 作者ID
+            'template' => '',                         // 模板
+            'type' => 'attachment',                    // 类型必须是 'attachment'
+            'status' => 'publish',                    // 状态
+            'password' => '',                         // 密码
+            'commentsNum' => 0,                       // 评论数
+            'allowComment' => 1,                      // 允许评论
+            'allowPing' => 1,                         // 允许ping
+            'allowFeed' => 1,                         // 允许feed
+            'parent' => $postId,                      // 关联到文章
+            'views' => 0
+        ];
+        
+        // 插入记录
+        $insertId = $db->query($db->insert('table.contents')->rows($data));
+        
+        if (!$insertId) {
+            throw new Exception('附件记录插入失败');
+        }
+        
+        // 生成图片html代码
+        $html = '<p>'. "\n\n";
+        $html .= '<img class="chrison-attachment" src="' . $imageUrl . '" alt="' . $attachment['name'] . '">';
+        $html .= "\n\n".'</p>';
+        
+       return $html;
     }
     
     /**
@@ -512,6 +587,7 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
         return 'jpg'; // 默认扩展名
     }
     
+    
     /**
      * 处理标签
      * @param int $postId 文章ID
@@ -583,6 +659,56 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
                 $insertRelation = $db->insert('table.relationships')->rows($relationData);
                 $db->query($insertRelation);
             }
+        }
+    }
+    
+    
+    /**
+     * 为文章添加自定义字段
+     * @param int $cid 文章CID
+     * @param array $fields 字段数组，如 ['custom_field1' => 'value1', 'custom_field2' => 'value2']
+     * @return bool
+     */
+    function addPostCustomFields($cid, $fields)
+    {
+        if (empty($cid) || empty($fields) || !is_array($fields)) {
+            return false;
+        }
+        
+        $db = Db::get();
+        
+        try {
+            foreach ($fields as $name => $value) {
+                // 检查字段是否已存在
+                $exists = $db->fetchRow($db->select()
+                    ->from('table.fields')
+                    ->where('cid = ?', $cid)
+                    ->where('name = ?', $name));
+                
+                if ($exists) {
+                    // 更新现有字段
+                    $db->query($db->update('table.fields')
+                        ->rows(['str_value' => $value])
+                        ->where('cid = ?', $cid)
+                        ->where('name = ?', $name));
+                } else {
+                    // 插入新字段
+                    $db->query($db->insert('table.fields')
+                        ->rows([
+                            'cid' => $cid,
+                            'name' => $name,
+                            'type' => 'str',
+                            'str_value' => $value,
+                            'int_value' => 0,
+                            'float_value' => 0.0
+                        ]));
+                }
+            }
+            
+            return true;
+        } catch (Exception $e) {
+            error_log("添加自定义字段失败: " . $e->getMessage());
+            return false;
         }
     }
 }
