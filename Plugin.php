@@ -19,7 +19,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
 
 
 /**
- * Blog Helper - 一款可以一键同步微信运动、快速发布说说/时光机/碎语/心情等功能的插件。插件作者：<a href="https://chrison.cn" target="_blank">Chrison</a>。插件说明：<a href="https://chrison.cn" target="_blank">Blog Helper文档</a>
+ * Blog Helper - 一款可以一键同步微信运动、快速发布说说/时光机/碎语/心情等功能的插件。<br>插件作者：<a href="https://chrison.cn" target="_blank">Chrison</a>。<br>插件说明：<a href="https://chrison.cn" target="_blank">Blog Helper文档</a>
  *
  * @package Blog Helper
  * @author Chrison
