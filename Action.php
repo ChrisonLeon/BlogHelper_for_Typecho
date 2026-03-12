@@ -317,7 +317,7 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             }
             
             // 12. 添加来源到自定义字段
-            $this->addPostCustomFields($postId,['chrison_via' => '微信小程序', 'chrison_version' => '1.1.0', 'chrison_latout' => $imageLayout]);
+            $this->addPostCustomFields($postId,['chrison_via' => '微信小程序']);
             
             $this->response->setStatus(200);
             $this->response->throwJson(['status' => 'success', 'message' => '发布成功']);
