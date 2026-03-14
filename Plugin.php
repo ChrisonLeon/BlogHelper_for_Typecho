@@ -19,12 +19,12 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
 
 
 /**
- * Blog Helper - 一款可以一键同步微信运动、快速发布说说/时光机/碎语/心情等功能的插件。<br>插件作者：<a href="https://chrison.cn" target="_blank">Chrison</a>。<br>插件说明：<a href="https://chrison.cn" target="_blank">Blog Helper文档</a>
+ * Blog Helper - 一款可以一键同步微信运动、快速发布说说/时光机/碎语/心情等功能的插件。插件作者：<a href="https://chrison.cn" target="_blank">Chrison</a>。插件说明：<a href="https://chrison.cn/work/369.html" target="_blank">Blog Helper文档</a>
  *
  * @package Blog Helper
  * @author Chrison
  * @version 1.2.0
- * @link https://chrison.cn
+ * @link https://chrison.cn/work/369.html
  */
 class Plugin implements PluginInterface
 {
@@ -120,6 +120,7 @@ class Plugin implements PluginInterface
             '在后台显示微信运动（头部导航处）'
         );
         $form->addInput($showInBackend);
+        
         
         $php_code = '<?php Typecho_Plugin::factory(\'Blog_Helper\')->Chrison(); ?>';
         $show_description = '在前台显示微信运动：页面任意位置插入指定代码即可=> ' . htmlspecialchars($php_code);

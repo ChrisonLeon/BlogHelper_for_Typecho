@@ -236,7 +236,6 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             'allowPing'    => 1,
             'allowFeed'    => 1,
             'parent'     => 0,
-            'views'      => 1,
             'password'   => null,
             'template'   => ''
         ];
@@ -564,8 +563,7 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
                 'allowComment' => 1,                      // 允许评论
                 'allowPing' => 1,                         // 允许ping
                 'allowFeed' => 1,                         // 允许feed
-                'parent' => $postId,                      // 关联到文章
-                'views' => 0
+                'parent' => $postId                      // 关联到文章
             ];
             
             // 插入记录
@@ -677,8 +675,7 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             'allowComment' => 1,                      // 允许评论
             'allowPing' => 1,                         // 允许ping
             'allowFeed' => 1,                         // 允许feed
-            'parent' => $postId,                      // 关联到文章
-            'views' => 0
+            'parent' => $postId                      // 关联到文章
         ];
         
         // 插入记录
