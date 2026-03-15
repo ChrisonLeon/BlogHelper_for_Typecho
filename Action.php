@@ -62,6 +62,9 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             case 'steps':
                 $this->steps($inputData);
                 break;
+            case 'status':
+                $this->status($inputData);
+                break;
             case 'storys':
                 $this->storys($inputData);
                 break;
@@ -132,6 +135,71 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
         } else {
             $this->response->setStatus(403);
             $this->response->throwJson(['status' => 'fail', 'message' => '同步失败']);
+        }
+    }
+    
+    
+    private function status($inputData){
+        // 从 JSON 数据中获取参数
+        $action = isset($inputData['action']) ? $inputData['action'] : '';
+        $openid = isset($inputData['openid']) ? $inputData['openid'] : '';
+        $emojiId = isset($inputData['emojiId']) ? $inputData['emojiId'] : '';
+        $emojiName = isset($inputData['emojiName']) ? $inputData['emojiName'] : '';
+        $customText = isset($inputData['customText']) ? $inputData['customText'] : '';
+        $timestamp = isset($inputData['timestamp']) ? $inputData['timestamp'] : '';
+        $sign = isset($inputData['sign']) ? $inputData['sign'] : '';
+        
+        if(empty($openid)){
+            $this->response->setStatus(403);
+            $this->response->throwJson(['status' => 'fail', 'message' => '参数异常（1）']);
+        }
+        
+        if(empty($emojiId)){
+            $this->response->setStatus(403);
+            $this->response->throwJson(['status' => 'fail', 'message' => '参数异常（2）']);
+        }
+        
+        if(empty($sign)){
+            $this->response->setStatus(403);
+            $this->response->throwJson(['status' => 'fail', 'message' => '参数异常（3）']);
+        }
+        
+        // 获取系统配置选项
+        $options = Options::alloc();
+        // 获取插件配置
+        $plugin = $options->plugin('BlogHelper');
+        // 插件参数值
+        $secret = $plugin->secret_key;
+        
+        // 加解密
+        $_sign = md5($action . $openid . $emojiId . $secret);
+        
+        if($_sign !== $sign){
+            $this->response->setStatus(403);
+            $this->response->throwJson(['status' => 'fail', 'message' => '校验失败']);
+        }
+        
+        // 格式化时间
+        $syncTime = date('Y-m-d H:i:s', is_numeric($timestamp) ? $timestamp : time());
+
+        $db = Db::get();
+        $prefix = $db->getPrefix();
+        $row_id = $db->query($db->insert($prefix . 'blog_helper_status')
+        ->rows([
+            'openid' => $openid,
+            'emojiId' => $emojiId,
+            'emojiName' => $emojiName,
+            'customText' => $customText,
+            'created' => $syncTime
+        ]));
+        
+
+        if ($row_id) {
+            $this->response->setStatus(200);
+            $this->response->throwJson(['status' => 'success', 'message' => '状态同步成功']);
+        } else {
+            $this->response->setStatus(403);
+            $this->response->throwJson(['status' => 'fail', 'message' => '状态同步失败']);
         }
     }
     
@@ -282,9 +350,9 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
             $finalContent = '';
             if (!empty($attachmentHtml)) {
                 if ($imagePosition == 'top') {
-                    $finalContent = $markdown . "\n\n" . $attachmentHtml . "\n\n" . $content;
+                    $finalContent = $markdown . "\n\n" . $attachmentHtml . "\n\n" . '<!--more-->' . "\n\n" . $content;
                 } elseif ($imagePosition == 'bottom') {
-                    $finalContent = $markdown . "\n\n" . $content . "\n\n" . $attachmentHtml;
+                    $finalContent = $markdown . "\n\n" . $content . "\n\n" . '<!--more-->' . "\n\n" . $attachmentHtml;
                 }
             } else {
                 $finalContent = $markdown . "\n\n" . $content;
@@ -502,6 +570,9 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
     
     private function processImageAsAttachments($postId, $imageLayout, $imageListUrl){
         
+        // 获取当前 Typecho 版本号
+        $version = Common::VERSION;
+        
         $db = Db::get();
         
         // 根据布局确定容器类
@@ -542,9 +613,19 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
                 'name' => $fileInfo['basename'],    // 文件名
                 'path' => $imageUrl,           // 相对路径
                 'size' => $fileSize,                // 文件大小（字节）
-                'type' => 'application/octet-stream', // MIME类型
+                //'type' => 'application/octet-stream', // MIME类型
+                'type' => strtolower(end(explode('.', $fileInfo['basename']))), // MIME类型
                 'mime' => Common::mimeContentType($absolutePath) // 更精确的MIME类型
             ];
+            
+            // 判断版本：如果是 1.3.0 及以上，使用 JSON 格式
+            if (version_compare($version, '1.3.0', '>=')) {
+                // 新版使用 JSON (推荐)
+                $text = json_encode($attachment, JSON_UNESCAPED_UNICODE);
+            } else {
+                // 旧版使用序列化 (兼容)
+                $text = serialize($attachment);
+            }
             
             // 插入数据
             $data = [
@@ -552,7 +633,7 @@ class BlogHelper_Action extends Typecho_Widget implements Widget_Interface_Do
                 'slug' => $attachment['name'],            // 缩略名，也可生成唯一值
                 'created' => time(),                      // 创建时间戳
                 'modified' => time(),                     // 修改时间戳
-                'text' => serialize($attachment),         // 元数据序列化
+                'text' => $text,                         // 元数据序列化（区分下版本）
                 'order' => 0,                             // 排序
                 'authorId' => 1,                    // 作者ID
                 'template' => '',                         // 模板
