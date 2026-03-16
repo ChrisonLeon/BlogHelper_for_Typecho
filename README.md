@@ -23,12 +23,14 @@
 
 ## 关于插件
 
+# 已安装的用户，务必要停用后再启用！！！！！
+
 ```php
 /**
  * Blog Helper - 一款可以一键同步微信运动、快速发布说说/时光机/碎语/心情等功能的插件。
  *
  * @package Blog Helper
  * @author Chrison
- * @version 1.2.0
+ * @version 1.3.0
  * @link https://chrison.cn/work/369.html
  */

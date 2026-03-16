@@ -1,0 +1,47 @@
+.chrison-blog-helper-full { 
+  text-align: center; 
+  padding: 20px; 
+  margin: 0 auto; 
+  color: #666; 
+} 
+
+.chrison-blog-helper-full .step_num {
+  font-size: 24px; 
+  font-weight: bold; 
+  color: #4CAF50;
+} 
+
+.chrison-blog-helper-full .step_date {
+  font-size: 12px; 
+  color: #999;
+}
+
+.chrison-blog-helper-full .my_status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 5px 0;
+  gap: 8px;
+  font-size: 12px; 
+  color: #999;
+}
+
+.chrison-blog-helper-full .status_pic_wrapper {
+  width: 32px;
+  height: 32px;
+  background-color: #4CAF50;  /* 绿色底色，可以改成你喜欢的颜色 */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 图片样式 */
+.chrison-blog-helper-full .status_pic {
+  filter: brightness(0) invert(1);
+  display: block;
+}
+
+.chrison-blog-helper-full .status_text {
+  
+}
