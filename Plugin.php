@@ -151,16 +151,16 @@ class Plugin implements PluginInterface
         $form->addInput($showMyStatus);
         
         $showTime = new Text(
-		'showTime', NULL,
-		'6',
-		_t('显示时长'),
-		_t('
-			1. 输入显示状态气泡的时长（单位：小时）<br/>
-			2. 输入 1 则间隔时长为 1 小时。<br/>
-			3. 输入 8 则间隔时长为 8 小时。<br/>
-			<h2 style="text-align:center">微信运动步数、状态文字和图片的获取</h2>
-		'));
-		$form->addInput($showTime);
+        'showTime', NULL,
+        '6',
+        _t('显示时长'),
+        _t('
+            1. 输入显示状态气泡的时长（单位：小时）<br/>
+            2. 输入 1 则间隔时长为 1 小时。<br/>
+            3. 输入 8 则间隔时长为 8 小时。<br/>
+            <h2 style="text-align:center">微信运动步数、状态文字和图片的获取</h2>
+        '));
+        $form->addInput($showTime);
         
         
         // 方式一：变量参数替换
@@ -178,8 +178,15 @@ class Plugin implements PluginInterface
         $otherData1 = new Textarea(
             'otherData1',
             NULL,
-            '独立使用说明：
-            插入下面代码后，获得参数$alone_code，数组形式，包含以上四个参数',
+            '插入下面代码后，获得参数$alone_code，可按需获取‘微信步数’、‘同步时间’、‘当前状态’、‘状态图片’、‘状态时间’
+  <?php 
+    $alone_code = Typecho_Plugin::factory(\'Blog_Helper\')->ChrisonAlone(); 
+    echo \'微信步数：\'.$alone_code[\'step_num\'].\'<br>\';
+    echo \'同步时间：\'.$alone_code[\'step_short_date\'].\'|\'.$alone_code[\'step_full_date\'].\'<br>\';
+    echo \'当前状态：\'.\'<img src=\'.$alone_code[\'status_pic_url\'].\' width=\"28\" style=\"filter: invert(80%);\">\'.$alone_code[\'status_text\'].\'<br>\';
+    echo \'同步时间：\'.$alone_code[\'status_short_date\'].\'|\'.$alone_code[\'status_full_date\'].\'<br>\';
+  ?>
+            ',
             '方式二：独立获取并使用',
             $alone_code
         );
@@ -293,9 +300,12 @@ class Plugin implements PluginInterface
     {
         $result = [
             "step_num" => "",
-            "step_date" => "",
+            "step_short_date" => "",
+            "step_full_date" => "",
             "status_text" => "",
             "status_pic_url" => "",
+            "status_short_date" => "",
+            "status_full_date" => "",
         ];
         
         // 获取系统配置
@@ -312,23 +322,27 @@ class Plugin implements PluginInterface
         $step_data = $db->fetchRow($db->select()->from($prefix.'blog_helper_wechat')->where('1 = ?', 1)->order('created', Db::SORT_DESC));
         
         if($step_data !== null){
+            $step_time = strtotime($step_data['created'] ?? '1970-01-01');
             $result['step_num'] = $step_data['steps'] ?? '';
-            $result['step_date'] = date('Y-m-d', strtotime($step_data['created']??'1970-01-01'));
+            $result['step_short_date'] = date('Y-m-d', $step_time);
+            $result['step_full_date'] = date('Y-m-d H:i:s', $step_time);
         }
         if($status_data !== null){
             $emojiId = $status_data['emojiId'];
             $emojiName = $status_data['emojiName'];
             $customText = $status_data['customText'];
             $text = !empty($customText) ? $customText : $emojiName;
-            $created_time = strtotime($status_data['created'] ?? '1970-01-01');
+            $status_time = strtotime($status_data['created'] ?? '1970-01-01');
             $current_time = time();
             $showTime = !empty($pluginConfig->showTime) ? $pluginConfig->showTime : 6;
             $mill = $showTime * 60 * 60;
             
             // 判断是否超过小时（$mill * 60 * 60 = XXX秒）
-            if (($current_time - $created_time) <= $mill) {
+            if (($current_time - $status_time) <= $mill) {
                 $result['status_text'] = $text;
                 $result['status_pic_url'] = Plugin::iconUrl($emojiId);
+                $result['status_short_date'] = date('Y-m-d', $status_time);
+                $result['status_full_date'] = date('Y-m-d H:i:s', $status_time);
             }
         }
         
@@ -388,8 +402,8 @@ class Plugin implements PluginInterface
     
     
     public static function paramsCode()
-	{
-	    $params_html = "<div class='chrison-blog-helper-full'>
+    {
+        $params_html = "<div class='chrison-blog-helper-full'>
   <div class='step_num'>{step_num}</div>
   <div class='step_date'>{step_date}</div>
   <div class='my_status'>
@@ -400,10 +414,10 @@ class Plugin implements PluginInterface
   </div>
 </div>";
         return $params_html;
-	}
-	
-	public static function cssCode(){
-	    $css_code = ".chrison-blog-helper-full { 
+    }
+    
+    public static function cssCode(){
+        $css_code = ".chrison-blog-helper-full { 
   text-align: center; 
   padding: 20px; 
   margin: 0 auto; 
@@ -451,7 +465,7 @@ class Plugin implements PluginInterface
   
 }";
         return $css_code;
-	}
+    }
     
     /**
      * 状态图标
@@ -461,52 +475,52 @@ class Plugin implements PluginInterface
      * @return void
      */
     public static function iconUrl($emojiId)
-	{
+    {
 
         $Settings = Helper::options()->plugin('BlogHelper');
-		$Plugin_Url = Helper::options()->pluginUrl .'/BlogHelper/';
+        $Plugin_Url = Helper::options()->pluginUrl .'/BlogHelper/';
 
-		if ($emojiId == 'xqxf-mzz') { $iconUrl = $Plugin_Url.'assets/status/mzz.png'; }
-		else if ($emojiId == 'xqxf-lk') { $iconUrl = $Plugin_Url.'assets/status/lk.png'; }
-		else if ($emojiId == 'xqxf-qjl') { $iconUrl = $Plugin_Url.'assets/status/qjl.png'; }
-		else if ($emojiId == 'xqxf-dqt') { $iconUrl = $Plugin_Url.'assets/status/dqt.png'; }
-		else if ($emojiId == 'xqxf-pb') { $iconUrl = $Plugin_Url.'assets/status/pb.png'; }
-		else if ($emojiId == 'xqxf-fd') { $iconUrl = $Plugin_Url.'assets/status/fd.png'; }
-		else if ($emojiId == 'xqxf-c') { $iconUrl = $Plugin_Url.'assets/status/c.png'; }
-		else if ($emojiId == 'xqxf-emo') { $iconUrl = $Plugin_Url.'assets/status/emo.png'; }
-		else if ($emojiId == 'xqxf-hslx') { $iconUrl = $Plugin_Url.'assets/status/hslx.png'; }
-		else if ($emojiId == 'xqxf-yqmm') { $iconUrl = $Plugin_Url.'assets/status/yqmm.png'; }
-		else if ($emojiId == 'xqxf-bot') { $iconUrl = $Plugin_Url.'assets/status/bot.png'; }
+        if ($emojiId == 'xqxf-mzz') { $iconUrl = $Plugin_Url.'assets/status/mzz.png'; }
+        else if ($emojiId == 'xqxf-lk') { $iconUrl = $Plugin_Url.'assets/status/lk.png'; }
+        else if ($emojiId == 'xqxf-qjl') { $iconUrl = $Plugin_Url.'assets/status/qjl.png'; }
+        else if ($emojiId == 'xqxf-dqt') { $iconUrl = $Plugin_Url.'assets/status/dqt.png'; }
+        else if ($emojiId == 'xqxf-pb') { $iconUrl = $Plugin_Url.'assets/status/pb.png'; }
+        else if ($emojiId == 'xqxf-fd') { $iconUrl = $Plugin_Url.'assets/status/fd.png'; }
+        else if ($emojiId == 'xqxf-c') { $iconUrl = $Plugin_Url.'assets/status/c.png'; }
+        else if ($emojiId == 'xqxf-emo') { $iconUrl = $Plugin_Url.'assets/status/emo.png'; }
+        else if ($emojiId == 'xqxf-hslx') { $iconUrl = $Plugin_Url.'assets/status/hslx.png'; }
+        else if ($emojiId == 'xqxf-yqmm') { $iconUrl = $Plugin_Url.'assets/status/yqmm.png'; }
+        else if ($emojiId == 'xqxf-bot') { $iconUrl = $Plugin_Url.'assets/status/bot.png'; }
 
-		else if ($emojiId == 'gzxx-bz') { $iconUrl = $Plugin_Url.'assets/status/bz.png'; }
-		else if ($emojiId == 'gzxx-cmxx') { $iconUrl = $Plugin_Url.'assets/status/cmxx.png'; }
-		else if ($emojiId == 'gzxx-m') { $iconUrl = $Plugin_Url.'assets/status/m.png'; }
-		else if ($emojiId == 'gzxx-my') { $iconUrl = $Plugin_Url.'assets/status/my.png'; }
-		else if ($emojiId == 'gzxx-cc') { $iconUrl = $Plugin_Url.'assets/status/cc.png'; }
-		else if ($emojiId == 'gzxx-fbhj') { $iconUrl = $Plugin_Url.'assets/status/fbhj.png'; }
-		else if ($emojiId == 'gzxx-wrms') { $iconUrl = $Plugin_Url.'assets/status/wrms.png'; }
+        else if ($emojiId == 'gzxx-bz') { $iconUrl = $Plugin_Url.'assets/status/bz.png'; }
+        else if ($emojiId == 'gzxx-cmxx') { $iconUrl = $Plugin_Url.'assets/status/cmxx.png'; }
+        else if ($emojiId == 'gzxx-m') { $iconUrl = $Plugin_Url.'assets/status/m.png'; }
+        else if ($emojiId == 'gzxx-my') { $iconUrl = $Plugin_Url.'assets/status/my.png'; }
+        else if ($emojiId == 'gzxx-cc') { $iconUrl = $Plugin_Url.'assets/status/cc.png'; }
+        else if ($emojiId == 'gzxx-fbhj') { $iconUrl = $Plugin_Url.'assets/status/fbhj.png'; }
+        else if ($emojiId == 'gzxx-wrms') { $iconUrl = $Plugin_Url.'assets/status/wrms.png'; }
 
-		else if ($emojiId == 'hd-l') { $iconUrl = $Plugin_Url.'assets/status/l.png'; }
-		else if ($emojiId == 'hd-dk') { $iconUrl = $Plugin_Url.'assets/status/dk.png'; }
-		else if ($emojiId == 'hd-yd') { $iconUrl = $Plugin_Url.'assets/status/yd.png'; }
-		else if ($emojiId == 'hd-hkf') { $iconUrl = $Plugin_Url.'assets/status/hkf.png'; }
-		else if ($emojiId == 'hd-hnc') { $iconUrl = $Plugin_Url.'assets/status/hnc.png'; }
-		else if ($emojiId == 'hd-gf') { $iconUrl = $Plugin_Url.'assets/status/gf.png'; }
-		else if ($emojiId == 'hd-dw') { $iconUrl = $Plugin_Url.'assets/status/dw.png'; }
-		else if ($emojiId == 'hd-zjsj') { $iconUrl = $Plugin_Url.'assets/status/zjsj.png'; }
-		else if ($emojiId == 'hd-zp') { $iconUrl = $Plugin_Url.'assets/status/zp.png'; }
+        else if ($emojiId == 'hd-l') { $iconUrl = $Plugin_Url.'assets/status/l.png'; }
+        else if ($emojiId == 'hd-dk') { $iconUrl = $Plugin_Url.'assets/status/dk.png'; }
+        else if ($emojiId == 'hd-yd') { $iconUrl = $Plugin_Url.'assets/status/yd.png'; }
+        else if ($emojiId == 'hd-hkf') { $iconUrl = $Plugin_Url.'assets/status/hkf.png'; }
+        else if ($emojiId == 'hd-hnc') { $iconUrl = $Plugin_Url.'assets/status/hnc.png'; }
+        else if ($emojiId == 'hd-gf') { $iconUrl = $Plugin_Url.'assets/status/gf.png'; }
+        else if ($emojiId == 'hd-dw') { $iconUrl = $Plugin_Url.'assets/status/dw.png'; }
+        else if ($emojiId == 'hd-zjsj') { $iconUrl = $Plugin_Url.'assets/status/zjsj.png'; }
+        else if ($emojiId == 'hd-zp') { $iconUrl = $Plugin_Url.'assets/status/zp.png'; }
 
-		else if ($emojiId == 'xx-bg') { $iconUrl = $Plugin_Url.'assets/status/bg.png'; }
-		else if ($emojiId == 'xx-z') { $iconUrl = $Plugin_Url.'assets/status/z.png'; }
-		else if ($emojiId == 'xx-sj') { $iconUrl = $Plugin_Url.'assets/status/sj.png'; }
-		else if ($emojiId == 'xx-xm') { $iconUrl = $Plugin_Url.'assets/status/xm.png'; }
-		else if ($emojiId == 'xx-lg') { $iconUrl = $Plugin_Url.'assets/status/lg.png'; }
-		else if ($emojiId == 'xx-wyx') { $iconUrl = $Plugin_Url.'assets/status/wyx.png'; }
-		else if ($emojiId == 'xx-tg') { $iconUrl = $Plugin_Url.'assets/status/tg.png'; }
+        else if ($emojiId == 'xx-bg') { $iconUrl = $Plugin_Url.'assets/status/bg.png'; }
+        else if ($emojiId == 'xx-z') { $iconUrl = $Plugin_Url.'assets/status/z.png'; }
+        else if ($emojiId == 'xx-sj') { $iconUrl = $Plugin_Url.'assets/status/sj.png'; }
+        else if ($emojiId == 'xx-xm') { $iconUrl = $Plugin_Url.'assets/status/xm.png'; }
+        else if ($emojiId == 'xx-lg') { $iconUrl = $Plugin_Url.'assets/status/lg.png'; }
+        else if ($emojiId == 'xx-wyx') { $iconUrl = $Plugin_Url.'assets/status/wyx.png'; }
+        else if ($emojiId == 'xx-tg') { $iconUrl = $Plugin_Url.'assets/status/tg.png'; }
 
-		else if ($emojiId == 'diy') { $iconUrl = ''; } //自选状态
+        else if ($emojiId == 'diy') { $iconUrl = ''; } //自选状态
 
-		return $iconUrl;
+        return $iconUrl;
 
-	}
+    }
 }
