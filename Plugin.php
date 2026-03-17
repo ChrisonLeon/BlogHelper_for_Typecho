@@ -146,7 +146,7 @@ class Plugin implements PluginInterface
             ),
             '1',
             '在网站底部显示',
-            '状态图标和文字由小程序设置后推送显示（状态有效时间：24小时）<br>'.$status_code
+            '状态图标和文字由小程序设置后推送显示<br>'.$status_code
         );
         $form->addInput($showMyStatus);
         
@@ -183,7 +183,7 @@ class Plugin implements PluginInterface
     $alone_code = Typecho_Plugin::factory(\'Blog_Helper\')->ChrisonAlone(); 
     echo \'微信步数：\'.$alone_code[\'step_num\'].\'<br>\';
     echo \'同步时间：\'.$alone_code[\'step_short_date\'].\'|\'.$alone_code[\'step_full_date\'].\'<br>\';
-    echo \'当前状态：\'.\'<img src=\'.$alone_code[\'status_pic_url\'].\' width=\"28\" style=\"filter: invert(80%);\">\'.$alone_code[\'status_text\'].\'<br>\';
+    echo \'当前状态：\'.\'<img src=\'.$alone_code[\'status_pic_url\'].\' width="28" style="filter: invert(80%);">\'.$alone_code[\'status_text\'].\'<br>\';
     echo \'同步时间：\'.$alone_code[\'status_short_date\'].\'|\'.$alone_code[\'status_full_date\'].\'<br>\';
   ?>
             ',
@@ -365,37 +365,41 @@ class Plugin implements PluginInterface
         $prefix = $db->getPrefix();
         $status_data = $db->fetchRow($db->select()->from($prefix.'blog_helper_status')->where('1 = ?', 1)->order('created', Db::SORT_DESC));
         
-        if($status_data === null){
-            echo '';
-        } else {
-             //北京时间
-            date_default_timezone_set('PRC');
-            // 获取时间戳
-            $created_time = strtotime($status_data['created'] ?? '1970-01-01');
-            $current_time = time();
-            $showTime = !empty($pluginConfig->showTime) ? $pluginConfig->showTime : 6;
-            $mill = $showTime * 60 * 60;
-            
-            // 判断是否超过小时（$mill * 60 * 60 = XXX秒）
-            if (($current_time - $created_time) > $mill) {
+        $showMyStatus = $pluginConfig->showMyStatus;
+        
+        if($showMyStatus === '1'){
+            if($status_data === null){
                 echo '';
             } else {
-                $emojiId = $status_data['emojiId'];
-                $emojiName = $status_data['emojiName'];
-                $customText = $status_data['customText'];
-                $text = !empty($customText) ? $customText : $emojiName;
-                $iconUrl = Plugin::iconUrl($emojiId);
+                 //北京时间
+                date_default_timezone_set('PRC');
+                // 获取时间戳
+                $created_time = strtotime($status_data['created'] ?? '1970-01-01');
+                $current_time = time();
+                $showTime = !empty($pluginConfig->showTime) ? $pluginConfig->showTime : 6;
+                $mill = $showTime * 60 * 60;
                 
-                echo '<link rel="stylesheet" href="'.$Plugin_Url.'assets/css/status.css" />';
-                echo '<div id="chrison-blog-helper-status" class="chrison-blog-helper-status">';
-                echo '<div class="chrison-blog-helper-status-gravatar">';
-                echo $user->gravatar('96', '');
-                echo '</div>';
-                echo '<div class="chrison-blog-helper-status-content">';
-                echo '<img src="'.$iconUrl.'" alt="'.$text.'" />';
-                echo '<span>'.'正在'.$text.'</span>';
-                echo '</div>';
-                echo '</div>';
+                // 判断是否超过小时（$mill * 60 * 60 = XXX秒）
+                if (($current_time - $created_time) > $mill) {
+                    echo '';
+                } else {
+                    $emojiId = $status_data['emojiId'];
+                    $emojiName = $status_data['emojiName'];
+                    $customText = $status_data['customText'];
+                    $text = !empty($customText) ? $customText : $emojiName;
+                    $iconUrl = Plugin::iconUrl($emojiId);
+                    
+                    echo '<link rel="stylesheet" href="'.$Plugin_Url.'assets/css/status.css" />';
+                    echo '<div id="chrison-blog-helper-status" class="chrison-blog-helper-status">';
+                    echo '<div class="chrison-blog-helper-status-gravatar">';
+                    echo $user->gravatar('96', '');
+                    echo '</div>';
+                    echo '<div class="chrison-blog-helper-status-content">';
+                    echo '<img src="'.$iconUrl.'" alt="'.$text.'" />';
+                    echo '<span>'.'正在'.$text.'</span>';
+                    echo '</div>';
+                    echo '</div>';
+                }
             }
         }
     }
