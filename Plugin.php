@@ -14,8 +14,10 @@ use Typecho\Db;
 
 define('__TYPECHO_DEBUG__', true);
 
-define('__TYPECHO_GRAVATAR_PREFIX__', 'https://cn.cravatar.com/avatar/');
-
+if (!defined('__TYPECHO_GRAVATAR_PREFIX__')) {
+    // 如果未定义，则进行定义
+    define('__TYPECHO_GRAVATAR_PREFIX__', 'https://cn.cravatar.com/avatar/');
+}
 if (!defined('__TYPECHO_ROOT_DIR__')) {
     exit;
 }
@@ -26,7 +28,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package Blog Helper
  * @author Chrison
- * @version 1.2.0
+ * @version 1.3.5
  * @link https://chrison.cn/work/369.html
  */
 class Plugin implements PluginInterface
@@ -42,6 +44,8 @@ class Plugin implements PluginInterface
         \Typecho\Plugin::factory('Blog_Helper')->ChrisonFull = [__CLASS__, 'renderFront'];
         
         \Typecho\Plugin::factory('Blog_Helper')->ChrisonStatus = [__CLASS__, 'renderStatus'];
+        
+        \Typecho\Plugin::factory('Blog_Helper')->ChrisonAlone = [__CLASS__, 'renderAlone'];
         
         Helper::addRoute('chrison-blog-helper-api', '/api/chrison/blog_help', 'BlogHelper_Action', 'api');
         
@@ -98,10 +102,15 @@ class Plugin implements PluginInterface
         $pluginUrl = Helper::options()->pluginUrl;
         $qrcode = $pluginUrl . '/BlogHelper/assets/qrcode.jpeg';
         
-        $php_code1 = '<?php Typecho_Plugin::factory(\'Blog_Helper\')->ChrisonFull(); ?>';
-        $php_code2 = '<?php Typecho_Plugin::factory(\'Blog_Helper\')->ChrisonStatus(); ?>';
-        $show_description = '在前台显示完整数据：页面任意位置插入代码=> ' . htmlspecialchars($php_code1);
-        $show_description .= '<br>在前台显示状态数据：页面任意位置插入代码=> ' . htmlspecialchars($php_code2);
+        
+        $status_code = '<?php Typecho_Plugin::factory(\'Blog_Helper\')->ChrisonStatus(); ?>';
+        $status_code = '在网站任意页面任意位置位置插入代码=> ' . htmlspecialchars($status_code);
+        
+        $full_code = '<?php Typecho_Plugin::factory(\'Blog_Helper\')->ChrisonFull(); ?>';
+        $full_code = '<br>在网站任意页面任意位置位置插入代码=> ' . htmlspecialchars($full_code);
+        
+        $alone_code = '<?php $alone_code = Typecho_Plugin::factory(\'Blog_Helper\')->ChrisonAlone(); ?>';
+        $alone_code = '在网站任意页面任意位置位置插入代码=> ' . htmlspecialchars($alone_code);
         
         // 密钥
         $secret_key = new Text(
@@ -124,7 +133,7 @@ class Plugin implements PluginInterface
             '分类ID',
             '用于小程序快速发布说说/时光机/碎语/心情是的文章所属分类。<br>具体数值从后台“管理”=>“分类”=>进入编辑页面后，查看地址栏mid=XXX，XXX代表具体ID的值
             <br>
-            <p style="border-bottom: 1px solid #D9D9D6;"></p>'
+            <h2 style="text-align:center">状态气泡挂件的使用</h2>'
         );
         $form->addInput($mid);
         
@@ -136,113 +145,51 @@ class Plugin implements PluginInterface
                 '0' => '隐藏',
             ),
             '1',
-            '在网站底部显示“我的状态”',
-            '状态图标和文字由小程序设置后推送显示（状态有效时间：24小时）'
+            '在网站底部显示',
+            '状态图标和文字由小程序设置后推送显示（状态有效时间：24小时）<br>'.$status_code
         );
         $form->addInput($showMyStatus);
         
-        // 是否在网站页面显示数据
-        $showInFront = new Radio(
-            'showInFront',
-            array(
-                '1' => '显示',
-                '0' => '隐藏',
-            ),
-            '1',
-            '在网站页面显示数据',
-            $show_description.'
-            <br>
-            <p style="border-bottom: 1px solid #D9D9D6;"></p>
-            '
-        );
-        $form->addInput($showInFront);
+        $showTime = new Text(
+		'showTime', NULL,
+		'6',
+		_t('显示时长'),
+		_t('
+			1. 输入显示状态气泡的时长（单位：小时）<br/>
+			2. 输入 1 则间隔时长为 1 小时。<br/>
+			3. 输入 8 则间隔时长为 8 小时。<br/>
+			<h2 style="text-align:center">微信运动步数、状态文字和图片的获取</h2>
+		'));
+		$form->addInput($showTime);
         
         
-        // 前端格式化显示
+        // 方式一：变量参数替换
         $frontFormat = new Textarea(
             'frontFormat',
             NULL,
-            "<div class='chrison-blog-helper-full'>
-  <div class='step_num'>{step_num}</div>
-  <div class='step_date'>{step_date}</div>
-  <div class='my_status'>
-    <div class='status_pic_wrapper'>
-      <img class='status_pic' src='{status_pic_url}' width='32' height='32'>
-    </div>
-    <span class='status_text'>正在{status_text}</span>
-  </div>
-</div>",
-            '数据格式化（仅针对网站页面）',
-            '微信步数 => {step_num}    步数更新日期 => {step_date}    状态图片 => {status_pic_url}    状态文字 => {status_text}'
+            Plugin::paramsCode(),
+            '方式一：变量参数替换并格式化',
+            '微信步数 => {step_num}&nbsp;&nbsp;步数更新日期 => {step_date}&nbsp;状态图片 => {status_pic_url}&nbsp;状态文字 => {status_text}
+            '.$full_code
         );
         $form->addInput($frontFormat);
         
-        
-        // 是否在自定义CSS
-        $isCustomCss = new Radio(
-            'isCustomCss',
-            array(
-                '0' => '默认',
-                '1' => '自定义',
-            ),
-            '0',
-            '自定义样式',
-            "是否自定义前端的CSS样式"
+        // 方式二：独立获取并使用
+        $otherData1 = new Textarea(
+            'otherData1',
+            NULL,
+            '独立使用说明：
+            插入下面代码后，获得参数$alone_code，数组形式，包含以上四个参数',
+            '方式二：独立获取并使用',
+            $alone_code
         );
-        $form->addInput($isCustomCss);
-        
+        $form->addInput($otherData1);
         
         // 自定义CSS
         $customCSS = new Textarea(
             'customCSS',
             NULL,
-            '.chrison-blog-helper-full { 
-  text-align: center; 
-  padding: 20px; 
-  margin: 0 auto; 
-  color: #666; 
-} 
-
-.chrison-blog-helper-full .step_num {
-  font-size: 24px; 
-  font-weight: bold; 
-  color: #4CAF50;
-} 
-
-.chrison-blog-helper-full .step_date {
-  font-size: 12px; 
-  color: #999;
-}
-
-.chrison-blog-helper-full .my_status {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 5px 0;
-  gap: 8px;
-  font-size: 12px; 
-  color: #999;
-}
-
-.chrison-blog-helper-full .status_pic_wrapper {
-  width: 32px;
-  height: 32px;
-  background-color: #4CAF50;  /* 绿色底色，可以改成你喜欢的颜色 */
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 图片样式 */
-.chrison-blog-helper-full .status_pic {
-  filter: brightness(0) invert(1);
-  display: block;
-}
-
-.chrison-blog-helper-full .status_text {
-  
-}',
+            Plugin::cssCode(),
             '自定义CSS',
             '自定义样式'
         );
@@ -291,67 +238,103 @@ class Plugin implements PluginInterface
      */
     public static function renderFront(){
         $options = Options::alloc()->plugin('BlogHelper');
-        $showInFront = $options->showInFront;
         $frontFormat = $options->frontFormat;
-        $isCustomCss = $options->isCustomCss;
         $customCSS = $options->customCSS;
         
-        // 页面是否显示
-        if($showInFront === '1'){ 
-            // 获取管理员信息
-            $user = Widget::widget('Widget_Users_Admin@uid=' . '1');
-            // 插件地址
-            $Plugin_Url = Helper::options()->pluginUrl .'/BlogHelper/';
-            // 数据库链接
-            $db = Db::get();
-            $prefix = $db->getPrefix();
-            // 状态数据
-            $status_data = $db->fetchRow($db->select()->from($prefix.'blog_helper_status')->where('1 = ?', 1)->order('created', Db::SORT_DESC));
-            // 微信数据
-            $step_data = $db->fetchRow($db->select()->from($prefix.'blog_helper_wechat')->where('1 = ?', 1)->order('created', Db::SORT_DESC));
-            // 变量数据
-            $step_num = '';
-            $step_date = '';
-            $status_text = '';
-            $status_pic_url = '';
-            if($step_data !== null){
-                $step_num = $step_data['steps'] ?? '';
-                $step_date = date('Y-m-d', strtotime($step_data['created']??'1970-01-01'));
-            }
-            if($status_data !== null){
-                $emojiId = $status_data['emojiId'];
-                $emojiName = $status_data['emojiName'];
-                $customText = $status_data['customText'];
-                $created_time = strtotime($status_data['created'] ?? '1970-01-01');
-                $status_date = date('Y-m-d', $created_time);
-                $status_text = !empty($customText) ? $customText : $emojiName;
-                $status_pic_url = Plugin::iconUrl($emojiId);
-            }
-            
-            // 判断格式化数据并处理
-            if (empty($frontFormat)) {
-                echo '请查看插件的“数据格式化”配置是否正确';
-            } else {
-                // 替换变量
-                $html = str_replace(
-                    ['{step_num}', '{step_date}', '{status_text}', '{status_pic_url}'],
-                    [$step_num, $step_date, $status_text, $status_pic_url],
-                    $frontFormat
-                );
-                
-                if($isCustomCss === '0'){
-                    echo '<link rel="stylesheet" href="'.$Plugin_Url.'assets/css/default.css" />';
-                } else {
-                    echo '<style type="text/css">' . "\n" .
-                         htmlspecialchars($options->customCSS) . "\n" . 
-                         '</style>' . "\n";
-                }
-                
-                echo '<div class="chrison-blog-helper-full">' . $html . ' </div>';
-            }
-            
-            
+
+        // 获取管理员信息
+        $user = Widget::widget('Widget_Users_Admin@uid=' . '1');
+        // 插件地址
+        $Plugin_Url = Helper::options()->pluginUrl .'/BlogHelper/';
+        // 数据库链接
+        $db = Db::get();
+        $prefix = $db->getPrefix();
+        // 状态数据
+        $status_data = $db->fetchRow($db->select()->from($prefix.'blog_helper_status')->where('1 = ?', 1)->order('created', Db::SORT_DESC));
+        // 微信数据
+        $step_data = $db->fetchRow($db->select()->from($prefix.'blog_helper_wechat')->where('1 = ?', 1)->order('created', Db::SORT_DESC));
+        // 变量数据
+        $step_num = '';
+        $step_date = '';
+        $status_text = '';
+        $status_pic_url = '';
+        if($step_data !== null){
+            $step_num = $step_data['steps'] ?? '';
+            $step_date = date('Y-m-d', strtotime($step_data['created']??'1970-01-01'));
         }
+        if($status_data !== null){
+            $emojiId = $status_data['emojiId'];
+            $emojiName = $status_data['emojiName'];
+            $customText = $status_data['customText'];
+            $created_time = strtotime($status_data['created'] ?? '1970-01-01');
+            $status_date = date('Y-m-d', $created_time);
+            $status_text = !empty($customText) ? $customText : $emojiName;
+            $status_pic_url = Plugin::iconUrl($emojiId);
+        }
+        
+        if(!empty($customCSS)){
+            echo '<style type="text/css">' . "\n" .
+                 htmlspecialchars($customCSS) . "\n" . 
+                 '</style>' . "\n";
+        }
+        
+        // 替换变量
+        $html = str_replace(
+            ['{step_num}', '{step_date}', '{status_text}', '{status_pic_url}'],
+            [$step_num, $step_date, $status_text, $status_pic_url],
+            $frontFormat
+        );
+
+        echo '<div class="chrison-blog-helper-full">' . $html . ' </div>';
+            
+    }
+    
+    public static function renderAlone()
+    {
+        $result = [
+            "step_num" => "",
+            "step_date" => "",
+            "status_text" => "",
+            "status_pic_url" => "",
+        ];
+        
+        // 获取系统配置
+        $options = Helper::options();
+        $pluginConfig = $options->plugin('BlogHelper');
+        //北京时间
+        date_default_timezone_set('PRC');
+        // 数据库链接
+        $db = Db::get();
+        $prefix = $db->getPrefix();
+        // 状态数据
+        $status_data = $db->fetchRow($db->select()->from($prefix.'blog_helper_status')->where('1 = ?', 1)->order('created', Db::SORT_DESC));
+        // 微信数据
+        $step_data = $db->fetchRow($db->select()->from($prefix.'blog_helper_wechat')->where('1 = ?', 1)->order('created', Db::SORT_DESC));
+        
+        if($step_data !== null){
+            $result['step_num'] = $step_data['steps'] ?? '';
+            $result['step_date'] = date('Y-m-d', strtotime($step_data['created']??'1970-01-01'));
+        }
+        if($status_data !== null){
+            $emojiId = $status_data['emojiId'];
+            $emojiName = $status_data['emojiName'];
+            $customText = $status_data['customText'];
+            $text = !empty($customText) ? $customText : $emojiName;
+            $created_time = strtotime($status_data['created'] ?? '1970-01-01');
+            $current_time = time();
+            $showTime = !empty($pluginConfig->showTime) ? $pluginConfig->showTime : 6;
+            $mill = $showTime * 60 * 60;
+            
+            // 判断是否超过小时（$mill * 60 * 60 = XXX秒）
+            if (($current_time - $created_time) <= $mill) {
+                $result['status_text'] = $text;
+                $result['status_pic_url'] = Plugin::iconUrl($emojiId);
+            }
+        }
+        
+        
+        
+       return $result;
     }
     
     
@@ -371,13 +354,16 @@ class Plugin implements PluginInterface
         if($status_data === null){
             echo '';
         } else {
-            
+             //北京时间
+            date_default_timezone_set('PRC');
             // 获取时间戳
             $created_time = strtotime($status_data['created'] ?? '1970-01-01');
             $current_time = time();
+            $showTime = !empty($pluginConfig->showTime) ? $pluginConfig->showTime : 6;
+            $mill = $showTime * 60 * 60;
             
-            // 判断是否超过24小时（24 * 60 * 60 = 86400秒）
-            if (($current_time - $created_time) > 86400) {
+            // 判断是否超过小时（$mill * 60 * 60 = XXX秒）
+            if (($current_time - $created_time) > $mill) {
                 echo '';
             } else {
                 $emojiId = $status_data['emojiId'];
@@ -400,6 +386,72 @@ class Plugin implements PluginInterface
         }
     }
     
+    
+    public static function paramsCode()
+	{
+	    $params_html = "<div class='chrison-blog-helper-full'>
+  <div class='step_num'>{step_num}</div>
+  <div class='step_date'>{step_date}</div>
+  <div class='my_status'>
+    <div class='status_pic_wrapper'>
+      <img class='status_pic' src='{status_pic_url}' width='32' height='32'>
+    </div>
+    <span class='status_text'>正在{status_text}</span>
+  </div>
+</div>";
+        return $params_html;
+	}
+	
+	public static function cssCode(){
+	    $css_code = ".chrison-blog-helper-full { 
+  text-align: center; 
+  padding: 20px; 
+  margin: 0 auto; 
+  color: #666; 
+} 
+
+.chrison-blog-helper-full .step_num {
+  font-size: 24px; 
+  font-weight: bold; 
+  color: #4CAF50;
+} 
+
+.chrison-blog-helper-full .step_date {
+  font-size: 12px; 
+  color: #999;
+}
+
+.chrison-blog-helper-full .my_status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 5px 0;
+  gap: 8px;
+  font-size: 12px; 
+  color: #999;
+}
+
+.chrison-blog-helper-full .status_pic_wrapper {
+  width: 32px;
+  height: 32px;
+  background-color: #4CAF50;  /* 绿色底色，可以改成你喜欢的颜色 */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 图片样式 */
+.chrison-blog-helper-full .status_pic {
+  filter: brightness(0) invert(1);
+  display: block;
+}
+
+.chrison-blog-helper-full .status_text {
+  
+}";
+        return $css_code;
+	}
     
     /**
      * 状态图标
